@@ -7,13 +7,23 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Scanner;
 
 public class MultiOpt {
     FileSystem fs;
+    public static final String HDFS_PATH = "hdfs://tsxtSandbox:9000";
 
     public static void main(String[] args) throws Exception {
         MultiOpt self = new MultiOpt();
-        self.fs = FileSystem.get(new URI("hdfs://tsxtSandbox:9000"), new Configuration());
+        Configuration conf = new Configuration();
+        conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+        conf.set("fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem");
+        conf.setBoolean("dfs.support.append", true);
+        conf.set("dfs.client.block.write.replace-datanode-on-failure.policy", "NEVER");
+        conf.set("dfs.client.block.write.replace-datanode-on-failure.enable", "true");
+        conf.set("dfs.replication", "1");
+        self.fs = FileSystem.get(new URI(HDFS_PATH), conf);
+        //todo args length restriction
         try {
             switch (args[0]) {
                 case "list":
@@ -94,9 +104,11 @@ public class MultiOpt {
         Path path = new Path(args[1]);
         if(fs.exists(path)) {
             System.out.println("'" + path + "' have already exists.");
+            return;
         }
         if(fs.exists(path.getParent()) && fs.getFileStatus(path.getParent()).isFile()) {
             System.out.println("'" + path + "' is a file, not a directory.");
+            return;
         } else {
             fs.mkdirs(path.getParent());
         }
@@ -121,17 +133,51 @@ public class MultiOpt {
     }
 
     void upload(String[] args) throws IOException {
-        String localFilePath = args[1];
-        String hdfsDir = args[2];
-        //todo append or overwrite
-        fs.copyFromLocalFile(new Path(localFilePath), new Path(hdfsDir));
+        Path localFilePath = new Path(args[1]);
+        Path hdfsDir = new Path(args[2]);
+        //append or overwrite
+        Path aimFile = Path.mergePaths(hdfsDir, new Path(localFilePath.getName()));
+        System.out.println(aimFile);
+        //java.lang.IllegalArgumentException: Wrong FS: hdfs://install.sh, expected: hdfs://tsxtSandbox:9000
+        if(fs.exists(aimFile)) {
+            if(fs.getFileStatus(aimFile).isDirectory()) {
+                System.out.println("'" + aimFile + "' is a directory.");
+                return;
+            }
+            System.out.print("append or overwrite:");
+            Scanner scanner = new Scanner(System.in);
+            String opt = scanner.nextLine();
+            if(opt.startsWith("a")) {
+//                System.out.println("append");
+                FileInputStream local = new FileInputStream(args[1]);
+                FSDataOutputStream stream = fs.append(aimFile);
+                byte[] buf = new byte[4096];
+                int len = -1;
+                while((len = local.read(buf)) > 0) {
+                    stream.write(buf, 0, len);
+//                    System.out.write(buf, 0, len);
+                }
+//                stream.write("hello".getBytes());
+                // why ???
+                stream.flush();
+                stream.close();
+            } else {
+                fs.copyFromLocalFile(false, true, localFilePath, hdfsDir);
+            }
+        } else {
+            fs.copyFromLocalFile(false, true, localFilePath, hdfsDir);
+        }
     }
 
     void download(String[] args) throws IOException {
-        String hdfsFilePath = args[1];
-        String localDir = args[2];
+        Path hdfsFilePath = new Path(args[1]);
+        Path localDir = new Path(args[2]);
         //todo save as new when duplicate
-        fs.copyToLocalFile(false, new Path(hdfsFilePath), new Path(localDir));
+        if(new File(localDir + "/" + hdfsFilePath.getName()).exists()) {
+            //todo
+        }
+        // org.apache.hadoop.fs.UnsupportedFileSystemException: No FileSystem for scheme "file"
+        fs.copyToLocalFile(false, hdfsFilePath, localDir);
     }
 
     void cat(String[] args) throws IOException {
@@ -166,6 +212,8 @@ public class MultiOpt {
         if (opt.startsWith("e")) {
             FSDataOutputStream stream = fs.append(hdfsFilePath);
             stream.write(content.getBytes(StandardCharsets.UTF_8));
+            stream.flush();
+            stream.close();
         }
         if (opt.startsWith("b")){
             FSDataInputStream inputStream = fs.open(hdfsFilePath);
@@ -177,6 +225,8 @@ public class MultiOpt {
             while((len = inputStream.read(buf)) > 0){
                 tmpOut.write(buf, 0, len);
             }
+            // org.apache.hadoop.fs.UnsupportedFileSystemException: No FileSystem for scheme "file"
+            System.out.println("tmp at " + tmp.getPath());
             fs.copyFromLocalFile(true, true, new Path(tmp.getPath()), hdfsFilePath);
         }
     }
