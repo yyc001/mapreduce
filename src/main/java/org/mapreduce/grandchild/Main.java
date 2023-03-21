@@ -1,8 +1,7 @@
-package org.mapreduce.merge;
+package org.mapreduce.grandchild;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -13,6 +12,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 public class Main {
 
@@ -27,7 +28,7 @@ public class Main {
 
         Job job = Job.getInstance();
         job.setJarByClass(Main.class);
-        job.setJobName("Merge files");
+        job.setJobName("Grandchild detection");
 
         //设置读取文件的路径，都是从HDFS中读取。读取文件路径从脚本文件中传进来
         for(int i = 0; i <otherArgs.length - 1;i++){
@@ -51,14 +52,33 @@ public class Main {
 
     static class Map extends Mapper<LongWritable, Text, Text, Text> {
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-            String line = value.toString();
-            context.write(new Text(line), new Text(""));
+            String[] line = value.toString().split(" ");
+            String child = line[0];
+            String parent = line[1];
+            context.write(new Text(parent), new Text("c " + child));
+            context.write(new Text(child), new Text("p " + parent));
         }
     }
 
-    public static class Reduce extends Reducer<Text, Text, Text, Text>{
+    static class Reduce extends Reducer<Text, Text, Text, Text>{
         public void reduce(Text key, Iterable<Text> values,Context context) throws IOException,InterruptedException{
-            context.write(key, new Text(""));
+            Set<String> children = new HashSet<>();
+            Set<String> parents = new HashSet<>();
+            for(Text val: values){
+                String[] line = val.toString().split(" ");
+                String opt = line[0];
+                String name = line[1];
+                if(opt.equals("c")) {
+                    children.add(name);
+                } else {
+                    parents.add(name);
+                }
+            }
+            for(String child: children) {
+                for(String parent: parents) {
+                    context.write(new Text(child), new Text(parent));
+                }
+            }
         }
     }
 }

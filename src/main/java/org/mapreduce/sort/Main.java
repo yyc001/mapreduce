@@ -1,4 +1,4 @@
-package org.mapreduce.merge;
+package org.mapreduce.sort;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -13,6 +13,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
 import java.io.IOException;
+import java.util.Iterator;
 
 public class Main {
 
@@ -42,23 +43,28 @@ public class Main {
         job.setReducerClass(Reduce.class);
 
         //设置reduce函数的key值
-        job.setOutputKeyClass(Text.class);
+        job.setOutputKeyClass(IntWritable.class);
         //设置reduce函数的value值
         job.setOutputValueClass(Text.class);
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
 
 
-    static class Map extends Mapper<LongWritable, Text, Text, Text> {
+    static class Map extends Mapper<LongWritable, Text, IntWritable, Text> {
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString();
-            context.write(new Text(line), new Text(""));
+            context.write(new IntWritable(Integer.parseInt(line)), new Text(""));
         }
     }
+    static int countNum = 0;
 
-    public static class Reduce extends Reducer<Text, Text, Text, Text>{
-        public void reduce(Text key, Iterable<Text> values,Context context) throws IOException,InterruptedException{
-            context.write(key, new Text(""));
+    static class Reduce extends Reducer<IntWritable, Text, Text, Text> {
+        public void reduce(IntWritable key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            ++countNum;
+            for(Text i: values) {
+                context.write(new Text(String.valueOf(Main.countNum)), new Text(String.valueOf(key)));
+            }
+
         }
     }
 }
