@@ -21,9 +21,8 @@ public class Example {
 
     public static Table getTable(String str){
         Table table = null;
-        try {
-            // 创建一个链接
-            Connection connection = ConnectionFactory.createConnection();
+        // 创建一个链接
+        try(Connection connection = ConnectionFactory.createConnection()) {
             // 获取数据表
             table = connection.getTable(TableName.valueOf(str));
         } catch (Exception e){
@@ -119,9 +118,8 @@ public class Example {
         scan.setFilter(filter);
         //分页 new PageFilter();
 
-        ResultScanner resultScanner = null;
         try {
-            resultScanner = table.getScanner(scan);
+            ResultScanner resultScanner = table.getScanner(scan);
             // 获取每一行的数据
             for (Result result : resultScanner){
                 // 获取每一行中每一列数据的信息
