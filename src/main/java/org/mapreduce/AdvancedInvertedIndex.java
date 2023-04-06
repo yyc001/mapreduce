@@ -1,7 +1,11 @@
 package org.mapreduce;
 
+import com.sun.xml.internal.rngom.ast.builder.GrammarSection;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
@@ -12,15 +16,12 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.GenericOptionsParser;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Scanner;
 
-public class InvertedIndex {
+public class AdvancedInvertedIndex {
 
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
@@ -30,34 +31,19 @@ public class InvertedIndex {
 
         //获取运行时输入的参数，一般是通过shell脚本文件传进来。
         String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
-        String inputDir;
-        String outputDir;
         if (otherArgs.length < 2) {
             System.err.println("No enough arguments");
-            inputDir = "/input";
-            outputDir = "/user/bigdata_202022300317/output";
-//            System.exit(2);
-        } else {
-            inputDir = otherArgs[0];
-            outputDir = otherArgs[1];
+            System.exit(2);
         }
+        String inputDir = otherArgs[0];
+        String outputDir = otherArgs[1];
 
-        // get stop words
-//        System.setProperty("HADOOP_USER_NAME", "bigdata_202022300317");
         FileSystem fs = FileSystem.get(new URI("hdfs://10.102.0.198:9000"), conf);
-//        FSDataInputStream inputStream = fs.open(new Path("/stop_words/stop_words_eng.txt"));
-//        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-//        String str;
-//        while ((str = reader.readLine()) != null) {
-//            Map.stopWords.add(str.trim());
-//        }
 
         Job job = Job.getInstance();
         job.setJarByClass(InvertedIndex.class);
         job.setJobName("Inverted Index");
-//        System.err.println("++++++++++++++++++++++++++++++++++++++");
 
-        //设置读取文件的路径，都是从HDFS中读取。读取文件路径从脚本文件中传进来
         RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(inputDir), true);
         while (iterator.hasNext()) {
             LocatedFileStatus fileStatus = iterator.next();
@@ -65,21 +51,13 @@ public class InvertedIndex {
             FileInputFormat.addInputPath(job, path);
         }
         FileInputFormat.addInputPath(job, new Path("/stop_words/stop_words_eng.txt"));
-        //设置mapreduce程序的输出路径，MapReduce的结果都是输入到文件中
         FileOutputFormat.setOutputPath(job, new Path(outputDir));
-
-        //设置实现了map函数的类
         job.setMapperClass(Map.class);
-        //设置实现了reduce函数的类
+        job.setCombinerClass(Combine.class);
         job.setReducerClass(Reduce.class);
 
-        //设置reduce函数的key值
         job.setOutputKeyClass(Text.class);
-        //设置reduce函数的value值
         job.setOutputValueClass(Text.class);
-//        System.err.println("****************************************");
-//        Logger logger = LoggerFactory.getLogger(InvertedIndex.class);
-//        logger.
         System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
 
@@ -102,7 +80,7 @@ public class InvertedIndex {
         }
     }
 
-    static class Reduce extends Reducer<Text, Text, Text, Text> {
+    static class Combine extends Reducer<Text, Text, Text, Text> {
         @Override
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             HashMap<String, Integer> documentCount = new HashMap<>();
@@ -127,7 +105,23 @@ public class InvertedIndex {
             }
             stringBuilder.append(String.format("<total,%d>.", sum));
             context.write(key, new Text(stringBuilder.toString()));
-//            System.out.printf("%s: %s\n", key, outputString);
+        }
+    }
+
+    static class Reduce extends Reducer<Text, Text, Text, Text> {
+        @Override
+        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            StringBuilder stringBuilder = new StringBuilder();
+            int sum = 0;
+            for(Text i: values){
+                Scanner scan = new Scanner(i.toString());
+                int num = scan.nextInt();
+                String str = scan.next();
+                sum += num;
+                stringBuilder.append(String.format("<%s,%d>;", str, num));
+            }
+            stringBuilder.append(String.format("<total,%d>.", sum));
+            context.write(key, new Text(stringBuilder.toString()));
         }
     }
 }
