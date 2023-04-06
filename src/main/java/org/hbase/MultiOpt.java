@@ -9,6 +9,8 @@ import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Scanner;
 
 public class MultiOpt {
 
@@ -17,20 +19,59 @@ public class MultiOpt {
     static Connection connection = null;
 
     public static void main(String[] args) {
+        System.out.println("Wait...");
         configuration = HBaseConfiguration.create();
         configuration.set("hbase.rootdir", "hdfs://localhost:9000/hbase");
         try {
             connection = ConnectionFactory.createConnection(configuration);
             admin = connection.getAdmin();
-            // todo opt
+            if(args.length < 2){
+                System.out.println("Input params:");
+                Scanner scan = new Scanner(System.in);
+                args = scan.nextLine().split(" ");
+            }
+            System.out.println("Processing..");
+            String tableName;
+            String row;
+            String column;
+            String value;
+            String[] fields;
+            String[] values;
+            switch (args[0]) {
+                case "create":
+                    tableName = args[1];
+                    fields = Arrays.copyOfRange(args, 2, args.length);
+                    createTable(tableName, fields);
+                    break;
+                case "put":
+                    tableName = args[1];
+                    row = args[2];
+                    fields = new String[]{args[3]};
+                    values = new String[]{args[4]};
+                    addRecord(tableName, row, fields, values);
+                    break;
+                case "scan":
+                    tableName = args[1];
+                    column = args[2];
+                    scanColumn(tableName, column);
+                    break;
+                case "delete":
+                    tableName = args[1];
+                    row = args[2];
+                    deleteRow(tableName, row);
+                    break;
+                default:
+                    System.err.println("No matched commands");
+            }
             admin.close();
             connection.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
+        System.out.println("Done");
     }
 
-    void createTable(String tableName, String[] fields) throws IOException {
+    static void createTable(String tableName, String[] fields) throws IOException {
         TableName table = TableName.valueOf(tableName);
         // 判断是否存在列族信息
         if (fields.length == 0) {
@@ -41,7 +82,6 @@ public class MultiOpt {
             admin.disableTable(table);
             admin.deleteTable(table);
         }
-        //判断表是否存在
         //创建表描述器
         TableDescriptorBuilder tableDescriptorBuilder = TableDescriptorBuilder.newBuilder(table);
         //创建多个列族
@@ -55,7 +95,7 @@ public class MultiOpt {
         System.out.println("表" + tableName + "创建成功！");
     }
 
-    void addRecord(String tableName, String row, String[] fields, String[] values) throws IOException {
+    static void addRecord(String tableName, String row, String[] fields, String[] values) throws IOException {
         Table table = connection.getTable(TableName.valueOf(tableName));
         for (int i = 0; i < fields.length; i++) {
             Put put = new Put(row.getBytes());
@@ -66,7 +106,7 @@ public class MultiOpt {
         table.close();
     }
 
-    void scanColumn(String tableName, String column) throws IOException {
+    static void scanColumn(String tableName, String column) throws IOException {
         Table table = connection.getTable(TableName.valueOf(tableName));
         Scan scan = new Scan();
         scan.addFamily(Bytes.toBytes(column));
@@ -84,23 +124,7 @@ public class MultiOpt {
         table.close();
     }
 
-    void modifyData(String tableName, String row, String column, String val) throws IOException {
-        Table table = connection.getTable(TableName.valueOf(tableName));
-        Put put = new Put(row.getBytes());
-        Scan scan = new Scan();
-        long ts = 0;
-        ResultScanner resultScanner = table.getScanner(scan);
-        for (Result r : resultScanner) {
-            for (Cell cell : r.getColumnCells(row.getBytes(), column.getBytes())) {
-                ts = cell.getTimestamp();
-            }
-        }
-        put.addColumn(row.getBytes(), column.getBytes(), ts, val.getBytes());
-        table.put(put);
-        table.close();
-    }
-
-    void deleteRow(String tableName, String row) throws IOException {
+    static void deleteRow(String tableName, String row) throws IOException {
         Table table = connection.getTable(TableName.valueOf(tableName));
         Delete delete = new Delete(row.getBytes());
         table.delete(delete);

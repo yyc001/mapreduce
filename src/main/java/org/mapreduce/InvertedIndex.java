@@ -16,6 +16,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -85,7 +86,26 @@ public class InvertedIndex {
 
 
     static class Map extends Mapper<LongWritable, Text, Text, Text> {
-//        static Set<String> stopWords = new HashSet<>();
+        private Set<String> stopWords;
+        @Override
+        public void setup(Context context) throws IOException {
+            Configuration conf = context.getConfiguration();
+
+            stopWords = new HashSet<>();
+
+            FileSystem fs = null;
+            try {
+                fs = FileSystem.get(new URI("hdfs://10.102.0.198:9000"), conf);
+            } catch (URISyntaxException e) {
+                throw new RuntimeException(e);
+            }
+            FSDataInputStream inputStream = fs.open(new Path("/stop_words/stop_words_eng.txt"));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            String str;
+            while ((str = reader.readLine()) != null) {
+                stopWords.add(str.trim());
+            }
+        }
 
         @Override
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
@@ -94,7 +114,7 @@ public class InvertedIndex {
             String fileName = fileSplit.getPath().getName();
             for (String word : line) {
                 word = word.trim().toLowerCase();
-                if (word.length() > 0) {
+                if (word.length() > 0 && !stopWords.contains(word)) {
                     context.write(new Text(word), new Text(fileName));
 //                    System.out.printf("%s <%s,%s>\n", word, fileName, key);
                 }
@@ -109,9 +129,6 @@ public class InvertedIndex {
             StringBuilder stringBuilder = new StringBuilder();
             for (Text i : values) {
                 String str = i.toString();
-                if (str.equals("stop_words_eng.txt")) {
-                    return;
-                }
                 Integer cnt = documentCount.get(str);
                 if(cnt == null) {
                     cnt = 1;
