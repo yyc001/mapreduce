@@ -18,18 +18,18 @@ import java.io.IOException;
 public class PageRankOutputFormat<K, V> extends FileOutputFormat<K, V> {
 
     @Override
-    public RecordWriter<K, V> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {
+    public RecordWriter<K, V> getRecordWriter(TaskAttemptContext job) throws IOException {
         Configuration conf = job.getConfiguration();
         FileSystem fs = FileSystem.get(conf);
         final FSDataOutputStream math = fs.create(new Path(conf.get("weightOutput")));
         return new RecordWriter<K, V>() {
             @Override
-            public void write(K key, V value) throws IOException, InterruptedException {
+            public void write(K key, V value) throws IOException {
                 math.write(String.format("(%s,%s)\n", key.toString(), value.toString()).getBytes());
             }
 
             @Override
-            public void close(TaskAttemptContext context) throws IOException, InterruptedException {
+            public void close(TaskAttemptContext context) throws IOException {
                 if (math != null) {
                     math.close();
                 }
