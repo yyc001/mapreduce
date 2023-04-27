@@ -25,7 +25,7 @@ public class PageRankMapper extends Mapper<Object, Text, Text, DoubleWritable> {
         Configuration conf = context.getConfiguration();
         int iterNum = conf.getInt("iterNum", 1);
         if (iterNum == 1) {
-            initialWeight = 1.0 / conf.getInt("totalPageNum", 1);
+            initialWeight = 1.0;
         } else {
             weight = new HashMap<>();
             FSDataInputStream inputStream = FileSystem.get(conf).open(new Path(conf.get("weightCheckpoint")));

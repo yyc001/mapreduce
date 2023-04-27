@@ -22,16 +22,8 @@ public class Main {
         String inputFile = "/ex3/input/DataSet";
         String outputSeq = "/user/bigdata_202022300317/exp3/out";
 
-        FSDataInputStream inputStream = FileSystem.get(conf).open(new Path(inputFile));
-        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-        int count = 0;
-        while (reader.readLine() != null) {
-            count ++;
-        }
-        conf.setInt("totalPageNum", count);
 
-
-        for (int i = 1; i <= 2; i++) {
+        for (int i = 1; i <= 10; i++) {
             conf.setInt("iterNum", i);
             conf.set("weightCheckpoint", outputSeq + (i - 1) + "/part-r-00000" );
 //            conf.set("weightOutput", outputSeq + i);
