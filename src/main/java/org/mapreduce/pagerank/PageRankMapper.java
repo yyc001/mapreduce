@@ -32,7 +32,9 @@ public class PageRankMapper extends Mapper<Object, Text, Text, DoubleWritable> {
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
             String str;
             while ((str = reader.readLine()) != null) {
-                String[] mp = str.trim().replaceAll("[()]", "").split(",");
+                str = str.trim();
+                str = str.substring(1, str.length()-1);
+                String[] mp = str.split(",");
                 weight.put(mp[0], Double.parseDouble(mp[1]));
             }
         }
