@@ -42,7 +42,10 @@ public class PageRank {
 
             rp = contributions.reduceByKey(Double::sum).mapValues(v -> 0.15 + 0.85 * v);
         }
-        rp.saveAsTextFile("hdfs://10.102.0.198:9000/user/bigdata_202022300317/exp3/out");
+        rp.mapToPair(tp -> new Tuple2<>(tp._2,tp._1))
+                .sortByKey(false)
+                .mapToPair(tp -> new Tuple2<>(tp._2,tp._1))
+                .saveAsTextFile("hdfs://10.102.0.198:9000/user/bigdata_202022300317/exp3/out");
 
         sc.close();
     }
