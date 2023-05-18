@@ -158,16 +158,15 @@ public class KMeans {
 
 
         for(int iter=0; iter<ITER; iter++) {
-            JavaRDD<Vector<Double>> finalNow_center = sc.parallelize(now_center);
+            List<List<Vector<Double>>> lNow_center = new ArrayList<>();
+            lNow_center.add(now_center);
+            JavaRDD<List<Vector<Double>>> finalNow_center = sc.parallelize(lNow_center);
             now_center = p.cartesian(finalNow_center)
-                    .groupByKey()
                     .mapToPair(x-> {
                         double now_dis = 1e9+7;
-                        int cls = 0;
-                        int i = -1;
-                        for(Vector<Double> x2: x._2) {
-                            i++;
-                            double distance = calc_distance(x._1, x2);
+                        int cls = -1;
+                        for(int i=0; i<x._2.size(); i++) {
+                            double distance = calc_distance(x._1, x._2.get(i));
                             if(now_dis > distance) {
                                 now_dis = distance;
                                 cls = i;
